@@ -7,7 +7,7 @@ target_apis: WKWebView, WebKit for Safari 27, Grid Lanes, Customizable Select, H
 
 WebKit for Safari 27 ships in macOS 27 Golden Gate with over 1,000 browser engine improvements and four headlining new web platform primitives: Grid Lanes for layout, Customizable Select for form controls, the HTML `<model>` element for spatial / immersive content, and Immersersive Environments for visionOS Safari. Safari web extensions can now be built and tested through Xcode Cloud without owning a Mac, and the longstanding Xcode Preview WebKit Swift overlay library resolution bug is fixed as of Xcode 27 Beta 2.
 
-For your app this module is about the embedded `WKWebView` used to render the live markdown preview. None of the new APIs are breaking — the macOS 27 release notes do not list any `WKWebView` API removals or signature changes — but the preview path now targets a substantially more capable engine.
+This module covers embedded `WKWebView` usage for live content preview in macOS 27. None of the new APIs are breaking — the macOS 27 release notes do not list any `WKWebView` API removals or signature changes — but the preview path now targets a substantially more capable engine.
 
 ## New APIs
 
@@ -23,7 +23,7 @@ configuration.defaultWebpagePreferences.allowsContentJavaScript = true
 configuration.applicationNameForUserAgent = "YourApp/\(Bundle.main.shortVersion)"
 
 let preview = WKWebView(frame: .zero, configuration: configuration)
-preview.loadHTMLString(renderedMarkdown, baseURL: workspaceBaseURL)
+preview.loadHTMLString(html, baseURL: baseURL)
 ```
 
 ### Grid Lanes — `macOS 27.0+`, WebKit / CSS
@@ -59,7 +59,7 @@ The HTML `<model>` element brings spatial / immersive content natively to the we
 <model src="figures/writers-room.usdz"
        environment="immersive"
        camera-orbit="45deg 60deg 2m">
-  <img src="figures/writers-room-fallback.png" alt="Writer's Room layout">
+  <img src="figures/writers-room-fallback.png" alt="3D scene preview">
 </model>
 ```
 
@@ -96,10 +96,10 @@ Code that used WebKit through Xcode Previews previously failed because a Swift o
 import WebKit
 
 @MainActor
-final class MarkdownPreviewController {
+final class WebPreviewController {
     private let webView: WKWebView
 
-    init(workspaceBaseURL: URL) {
+    init(baseURL: URL) {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.applicationNameForUserAgent = "YourApp/\(Bundle.main.shortVersion)"
@@ -110,7 +110,7 @@ final class MarkdownPreviewController {
     }
 
     func render(markdown: String, baseURL: URL) {
-        let html = MarkdownRenderer.render(markdown: markdown)
+        let html = HTMLRenderer.render(markdown: markdown)
         webView.loadHTMLString(html, baseURL: baseURL)
     }
 

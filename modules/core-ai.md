@@ -209,7 +209,7 @@ func registerBackgroundInference() {
 
 private func handleInference(task: BGProcessingTask) {
     let operation = Task {
-        let result = try await Summarizer.shared.runPending()
+        let result = try await ModelRunner.shared.runPending()
         task.setTaskCompleted(success: true)
         _ = result
     }
@@ -237,7 +237,7 @@ func traceGeneration(_ prompt: String) async throws -> String {
     await CoreAI.Instrumentation.beginInterval("summary")
     defer { Task { await CoreAI.Instrumentation.endInterval("summary") } }
 
-    let model = try await LocalModelRegistry.shared.model(for: "summarizer-v1")
+    let model = try await ModelRegistry.shared.model(for: "summarizer-v1")
     return try await model.generate(prompt: prompt)
 }
 ```
@@ -282,9 +282,9 @@ func streamSummary(_ text: String) -> AsyncThrowingStream<String, Error> {
 
 ## Migration from Tahoe
 
-The Tahoe skill referenced MLX as the third-party array framework for on-device ML. The macOS 27 release notes do not contain a separate "MLX" section; the **Core AI** framework is positioned as Apple's official on-device ML story. Migration items drawn from RESEARCH.md §3:
+The macOS 26 guidance referenced MLX as the third-party array framework for on-device ML. The macOS 27 release notes do not contain a separate "MLX" section; the **Core AI** framework is positioned as Apple's official on-device ML story. Migration items drawn from RESEARCH.md §3:
 
-- **MLX Framework community path remains available**, but the Apple-official path is now Core AI. If your project ever adopts MLX in a future release, evaluate a Core AI equivalent for tighter Apple Silicon integration and AOT specialization. Treat MLX as a portability / cross-platform option; treat Core AI as the production Apple-supported path.
+- **MLX Framework community path remains available**, but the Apple-official path is now Core AI. If a future project adopts MLX, evaluate a Core AI equivalent for tighter Apple Silicon integration and AOT specialization. Treat MLX as a portability / cross-platform option; treat Core AI as the production Apple-supported path.
 - **Large model loading performance improved** — multi-GB generative models now stream weights into the Neural Engine and deliver the first token while remaining layers are still being paged in. Cold-start latency for > 1 GB models is significantly reduced compared to Tahoe-era patterns.
 - **Neural Engine memory attributed to the app process** — visible in the Allocations instrument. This makes diagnosing ANE-driven memory pressure possible from Instruments rather than requiring external sampling. (174796039)
 - **AOT compilation requires Xcode 27 Beta 2+** — earlier Xcode 27 betas compile but do not emit the optimized bundle; confirm the build host runs Beta 2 or later. (181264112)

@@ -19,29 +19,29 @@ Entity schemas declare the shape of an app's content as it appears in the system
 import AppIntents
 import CoreSpotlight
 
-struct WorkspaceNoteEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Workspace Note"
+struct NoteEntity: AppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Note"
 
     var id: UUID
     var title: String
     var body: String
     var tags: [String]
 
-    static var defaultQuery = WorkspaceNoteQuery()
+    static var defaultQuery = NoteQuery()
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(title)", subtitle: "\(tags.joined(separator: ", "))")
     }
 
     @MainActor
-    func load(from index: WorkspaceNoteIndex) async throws -> WorkspaceNoteEntity {
+    func load(from index: NoteIndex) async throws -> NoteEntity {
         self
     }
 }
 
-struct WorkspaceNoteQuery: EntityQuery {
-    func entities(for identifiers: [UUID]) async throws -> [WorkspaceNoteEntity] { [] }
-    func suggestedEntities() async throws -> [WorkspaceNoteEntity] { [] }
+struct NoteQuery: EntityQuery {
+    func entities(for identifiers: [UUID]) async throws -> [NoteEntity] { [] }
+    func suggestedEntities() async throws -> [NoteEntity] { [] }
 }
 ```
 
@@ -52,9 +52,9 @@ Intent schemas let users trigger app actions with natural language without devel
 ```swift
 import AppIntents
 
-struct OpenWorkspaceNote: AppIntent {
-    static var title: LocalizedStringResource = "Open Workspace Note"
-    static var description = IntentDescription("Opens a note in the active workspace by title.")
+struct OpenNote: AppIntent {
+    static var title: LocalizedStringResource = "Open Note"
+    static var description = IntentDescription("Opens a note by title.")
 
     @Parameter(title: "Title")
     var title: String
@@ -65,7 +65,7 @@ struct OpenWorkspaceNote: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        try await WorkspaceService.shared.openNote(matching: title)
+        try await NoteService.shared.open(matching: title)
         return .result(dialog: "Opened \(title).")
     }
 }
@@ -80,7 +80,7 @@ import SwiftUI
 import AppIntents
 
 struct OutlineRow: View {
-    let section: WorkspaceSectionEntity
+    let section: SectionEntity
 
     var body: some View {
         HStack {
@@ -100,11 +100,11 @@ Introduced in WWDC26 295, the App Intents Testing framework validates an App Int
 import XCTest
 import AppIntentsTesting
 
-final class WorkspaceNoteIntentTests: XCTestCase {
-    func testOpenWorkspaceNoteByTitle() async throws {
+final class NoteIntentTests: XCTestCase {
+    func testOpenNoteByTitle() async throws {
         let session = IntentTestSession()
         let result = try await session.perform(
-            OpenWorkspaceNote(title: "Writer's Room draft")
+            OpenNote(title: "Meeting notes")
         )
         XCTAssertTrue(result.didOpenNote)
     }
@@ -161,8 +161,8 @@ Every `AppEntity` instance, including all child properties and values, must seri
 ```swift
 import AppIntents
 
-struct WorkspaceNoteEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Workspace Note"
+struct NoteEntity: AppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Note"
 
     @EntityProperty
     var id: UUID
@@ -173,20 +173,20 @@ struct WorkspaceNoteEntity: AppEntity {
     @EntityProperty
     var workspaceName: String
 
-    static var defaultQuery = WorkspaceNoteQuery()
+    static var defaultQuery = NoteQuery()
 
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(title)", subtitle: "\(workspaceName)")
     }
 }
 
-struct WorkspaceNoteQuery: EntityQuery {
-    func entities(for identifiers: [UUID]) async throws -> [WorkspaceNoteEntity] {
-        try await WorkspaceIndex.shared.notes(with: identifiers)
+struct NoteQuery: EntityQuery {
+    func entities(for identifiers: [UUID]) async throws -> [NoteEntity] {
+        try await NoteIndex.shared.notes(with: identifiers)
     }
 
-    func suggestedEntities() async throws -> [WorkspaceNoteEntity] {
-        try await WorkspaceIndex.shared.recentNotes(limit: 10)
+    func suggestedEntities() async throws -> [NoteEntity] {
+        try await NoteIndex.shared.recentNotes(limit: 10)
     }
 }
 ```
@@ -196,14 +196,14 @@ struct WorkspaceNoteQuery: EntityQuery {
 ```swift
 import AppIntents
 
-struct SummarizeWorkspaceNote: AppIntent {
-    static var title: LocalizedStringResource = "Summarize Workspace Note"
+struct SummarizeNote: AppIntent {
+    static var title: LocalizedStringResource = "Summarize Note"
     static var description = IntentDescription(
-        "Produces a three-bullet summary of a workspace note using the on-device model."
+        "Produces a three-bullet summary of a note using the on-device model."
     )
 
     @Parameter(title: "Note")
-    var note: WorkspaceNoteEntity
+    var note: NoteEntity
 
     static var parameterSummary: some ParameterSummary {
         Summary("Summarize \(\.$note)")
@@ -223,8 +223,8 @@ struct SummarizeWorkspaceNote: AppIntent {
 import SwiftUI
 import AppIntents
 
-struct WorkspaceOutlineView: View {
-    @State private var sections: [WorkspaceSectionEntity] = []
+struct OutlineView: View {
+    @State private var sections: [SectionEntity] = []
 
     var body: some View {
         List(sections) { section in
@@ -233,7 +233,7 @@ struct WorkspaceOutlineView: View {
                 Text(section.title)
             }
             .appEntityAnnotation(section)
-            .entityShortcut(.init(systemImageName: "doc.text", intent: OpenWorkspaceNote(title: section.title)))
+            .entityShortcut(.init(systemImageName: "doc.text", intent: OpenNote(title: section.title)))
         }
     }
 }
@@ -246,7 +246,7 @@ import FoundationModels
 import CoreSpotlight
 
 @MainActor
-func searchWorkspace(query: String) async throws -> String {
+func searchNotes(query: String) async throws -> String {
     let tool = SpotlightSearchTool(
         configuration: .init(sources: [.coreSpotlight], guide: .focused(.documents))
     )
@@ -263,12 +263,12 @@ import XCTest
 import AppIntentsTesting
 @testable import YourApp
 
-final class WorkspaceIntentsTests: XCTestCase {
+final class NoteIntentsTests: XCTestCase {
     func testSummarizeRoutesThroughFoundationModels() async throws {
         let session = IntentTestSession()
-        let note = try await WorkspaceIndex.shared.note(with: TestFixtures.writerRoomDraftID)
+        let note = try await NoteIndex.shared.note(with: UUID())
 
-        let result = try await session.perform(SummarizeWorkspaceNote(note: note))
+        let result = try await session.perform(SummarizeNote(note: note))
 
         XCTAssertFalse(result.value.isEmpty)
         XCTAssertGreaterThan(result.value.count, 40)
@@ -298,7 +298,7 @@ macOS 27 adds new properties to the `.photos.asset` schema. Existing conformance
 
 ### 3. Embedding the full body in a workspace entity
 
-A `WorkspaceNoteEntity` that serializes the entire note body, all embedded images, and the full revision history will exceed the 10 MB `AppEntity` cap once the note grows. Keep the entity lightweight and expose the body through an `EntityQuery` that loads it on demand.
+A `NoteEntity` that serializes the entire note body, all embedded images, and the full revision history will exceed the 10 MB `AppEntity` cap once the note grows. Keep the entity lightweight and expose the body through an `EntityQuery` that loads it on demand.
 
 ### 4. Defining natural-language intents without an `IntentDescription`
 

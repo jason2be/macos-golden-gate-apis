@@ -34,7 +34,7 @@ protocol WritableDocument: AnyObject {
 protocol Document: ReadableDocument, WritableDocument {}
 ```
 
-**The `Snapshot` type is whatever the conforming type chooses** (`String`, `Data`, `MarkdownRenderedDocument`, etc.). The lifecycle is:
+**The `Snapshot` type is whatever the conforming type chooses** (`String`, `Data`, `MySnapshot`, etc.). The lifecycle is:
 1. SwiftUI calls `reader(configuration:)` to get a `FileWrapperDocumentReader<Snapshot>`.
 2. The reader's closure transforms a `FileWrapper` to a `Snapshot` (synchronously, off the main actor if the closure is marked `@concurrent`).
 3. SwiftUI then calls `@MainActor apply(snapshot:previous:)` on the document to install the snapshot.
@@ -51,7 +51,7 @@ import SwiftUI
 
 @Observable
 @MainActor
-final class WorkspaceDocumentModel {
+final class DataViewModel {
     var draft: String = ""
     var lastSavedAt: Date?
 
@@ -70,7 +70,7 @@ New shape type plus modifier for input fields. `.squareBorder` and `.roundedBord
 ```swift
 import SwiftUI
 
-struct QuickFindBar: View {
+struct FindBar: View {
     @State private var query: String = ""
 
     var body: some View {
@@ -89,19 +89,19 @@ struct QuickFindBar: View {
 ```swift
 import SwiftUI
 
-struct EditorModePicker: View {
-    @State private var mode: EditorMode = .write
+struct ModePicker: View {
+    @State private var mode: Mode = .write
 
     var body: some View {
         Picker("Mode", selection: $mode) {
-            Label("Write", systemImage: "pencil").tag(EditorMode.write)
-            Label("Review", systemImage: "eye").tag(EditorMode.review)
-            Label("Diff", systemImage: "rectangle.split.2x1").tag(EditorMode.diff)
+            Label("Write", systemImage: "pencil").tag(Mode.write)
+            Label("Review", systemImage: "eye").tag(Mode.review)
+            Label("Diff", systemImage: "rectangle.split.2x1").tag(Mode.diff)
         }
         .pickerStyle(.tabs)
     }
 
-    enum EditorMode { case write, review, diff }
+    enum Mode { case write, review, diff }
 }
 ```
 
@@ -277,10 +277,10 @@ func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocu
 
 ```swift
 @main
-struct WorkspaceApp: App {
+struct SampleApp: App {
     var body: some Scene {
         DocumentGroup { @MainActor in
-            WorkspaceDocument(initialDraft: "")
+            SampleDocument(initialDraft: "")
         } editor: { config in
             EditorView(configuration: config)
         }
@@ -395,7 +395,7 @@ Pull-to-refresh controller for `NSScrollView`. Set via `NSScrollView.refreshCont
 let scrollView = NSScrollView()
 let controller = NSRefreshController { [weak scrollView] in
     Task {
-        await WorkspaceModel.shared.refresh()
+        await DataStore.shared.refresh()
         await MainActor.run {
             scrollView?.refreshController?.endRefreshing()
         }
@@ -427,7 +427,7 @@ Selection gestures now route through an `NSTextSelectionManager` (gesture-recogn
 ```swift
 import AppKit
 
-final class MarkdownTextView: NSTextView {
+final class CustomTextView: NSTextView {
     private lazy var linkTap: NSClickGestureRecognizer = {
         let recognizer = NSClickGestureRecognizer(target: self, action: #selector(handleLinkTap(_:)))
         recognizer.numberOfClicksRequired = 1
@@ -538,36 +538,48 @@ Your app's document type currently uses `ReferenceFileDocument`. Under macOS 27 
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct MarkdownDocument: Document {
+struct MyDocument: Document {
     static let readableContentTypes: [UTType] = [.markdown, .plainText]
     static let writableContentTypes: [UTType] = [.markdown]
 
     var text: String
 
-    init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
+    func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocumentReader<String> {
+        FileWrapperDocumentReader(configuration) { @concurrent fileWrapper in
+            guard let data = fileWrapper.regularFileContents else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            return String(decoding: data, as: UTF8.self)
         }
-        self.text = String(decoding: data, as: UTF8.self)
     }
 
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        let data = Data(text.utf8)
-        return FileWrapper(regularFileWithContents: data)
+    @MainActor func apply(snapshot: sending String, previous: sending String?) async throws {
+        self.text = snapshot
+    }
+
+    @MainActor func snapshot(contentType: UTType) async throws -> sending String {
+        text
+    }
+
+    func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<String> {
+        FileWrapperDocumentWriter(configuration) { @concurrent text in
+            let data = Data(text.utf8)
+            return FileWrapper(regularFileWithContents: data)
+        }
     }
 }
 
 @Observable
 @MainActor
-final class MarkdownViewModel {
+final class DocumentViewModel {
     var text: String
-    private weak var configuration: URLDocumentConfiguration<MarkdownDocument>?
+    private weak var configuration: URLDocumentConfiguration?
 
     init(text: String) {
         self.text = text
     }
 
-    func bind(_ configuration: URLDocumentConfiguration<MarkdownDocument>) {
+    func bind(_ configuration: URLDocumentConfiguration) {
         self.configuration = configuration
         configuration.didUndoChange = { [weak self] undoManager in
             self?.text = configuration.document.text
@@ -581,7 +593,7 @@ final class MarkdownViewModel {
 
 ### Pattern 2 — `NSRefreshController` in a document list
 
-The most common place to use pull-to-refresh is a workspace document list. The controller is created lazily, stored on the scroll view, and torn down with it.
+A common place to use pull-to-refresh is a list view. The controller is created lazily, stored on the scroll view, and torn down with it.
 
 ```swift
 import AppKit
@@ -601,7 +613,7 @@ final class RefreshableDocumentListController: NSViewController {
 
     private func refresh() {
         Task {
-            await WorkspaceModel.shared.reloadFromDisk()
+            await DataStore.shared.reloadFromDisk()
             await MainActor.run { [weak scrollView] in
                 scrollView?.refreshController?.endRefreshing()
                 tableView.reloadData()
@@ -613,7 +625,7 @@ final class RefreshableDocumentListController: NSViewController {
 
 ### Pattern 3 — `NSTextView` + gesture recognizer for clickable links
 
-The project currently overrides `mouseDown:` to detect link clicks. Under macOS 27 the recommendation is to use `NSClickGestureRecognizer` and let `NSTextSelectionManager` handle selection.
+Existing code may override `mouseDown:` to detect link clicks. Under macOS 27 the recommendation is to use `NSClickGestureRecognizer` and let `NSTextSelectionManager` handle selection.
 
 ```swift
 import AppKit
@@ -679,7 +691,7 @@ import AppKit
 enum AppMenuFactory {
     static func buildFileMenu() -> NSMenu {
         let menu = NSMenu(title: "File")
-        let newItem = NSMenuItem(title: "New", action: #selector(FileActions.new),
+        let newItem = NSMenuItem(title: "New", action: #selector(Actions.new),
                                  keyEquivalent: "n")
         newItem.image = NSImage(systemSymbolName: "doc.badge.plus",
                                 accessibilityDescription: "New document")
@@ -695,7 +707,7 @@ enum AppMenuFactory {
 
 ### Tahoe (26) → Golden Gate (27) SwiftUI deltas
 
-- **`FileDocument` deprecated** → migrate to `Document` (combined) or `ReadableDocument` + `WritableDocument`. The project currently uses `ReferenceFileDocument` in the document type and app entry point; both should plan for `Document` + a separate `@MainActor` `@Observable` configuration model. (178776840, 180302075)
+- **`FileDocument` deprecated** → migrate to `Document` (combined) or `ReadableDocument` + `WritableDocument`. Apps currently using `ReferenceFileDocument` should plan for migration to `Document` + a separate `@MainActor` `@Observable` configuration model. (178776840, 180302075)
 - **`FileWrapperDocumentWriter.makeFileWrapper` gains `previous:` parameter** — the closure signature changes for any package-format document. Add the new parameter and adopt in-place mutation for bundle packages. (180301399)
 - **Macro-based `@State`** — audit for the two broken patterns: (a) `init` assignment plus declaration default, (b) extension-memberwise-`init` synthesis when all stored members are private and any is `@State`. Back-deploys to iOS 17-aligned OSes but compiles against the new Xcode 27 SDK. (105893279)
 - **Menu bar images hidden by default** — symbols no longer appear in menu bars / context menus by default. Use `labelStyle(.titleAndIcon)` in SwiftUI or `NSMenuItem.preferredImageVisibility = .always` in AppKit to preserve icons for items that need them. (170480710, 170477566)
@@ -712,7 +724,7 @@ enum AppMenuFactory {
 
 ### Tahoe (26) → Golden Gate (27) AppKit deltas
 
-- **`NSTextView` selection uses `NSTextSelectionManager`** internally. Existing `mouseDown:` overrides keep working through a binary-compatible fallback but new code should use `NSClickGestureRecognizer` / `NSPressGestureRecognizer` etc. The project has three call sites to audit. (163365571)
+- **`NSTextView` selection uses `NSTextSelectionManager`** internally. Existing `mouseDown:` overrides keep working through a binary-compatible fallback but new code should use `NSClickGestureRecognizer` / `NSPressGestureRecognizer` etc. Audit existing `mouseDown:` overrides. (163365571)
 - **`NSRefreshController`** — adopt for any custom pull-to-refresh. (160867808)
 - **`NSToolbarItemGroup.role` / `NSSegmentedControl.role`** — set `.tabs` on segmented controls that should be announced as tabs by VoiceOver. (162577742)
 - **`NSApplication.presentationOptions.disableScreenCornerInteractions`** — opt out of Hot Corners while presenting a window that requires them disabled. (168692527)

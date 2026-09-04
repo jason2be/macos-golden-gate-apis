@@ -16,7 +16,7 @@ SwiftUI document-stack queries (e.g., FileDocument → Document migration) route
 
 ### Scenario 3: Cross-skill deferral
 **Result:** PASS
-Description is scoped to "macOS 27 Golden Gate"; no Tahoe/26 keywords. Sister skill `~/.agents/skills/macos-development/macos-tahoe-apis/` exists for Tahoe queries.
+Description is scoped to "macOS 27 Golden Gate"; no Tahoe/26 keywords. A sister skill exists for Tahoe queries.
 
 ## Application Test
 

@@ -5,7 +5,7 @@ target_apis: macOS Spatial Preview framework, SharePlay spatial collaboration, Q
 
 # Spatial Preview & Continuity (macOS 27)
 
-> **Scope:** This module covers the macOS 27 cross-device surface as documented in RESEARCH.md §2.7: the **macOS Spatial Preview framework**, **SharePlay**-based spatial collaboration, **Quick Look on visionOS** integration from a Mac app, and the **iPhone Mirroring** window-resize refinement. None of these map to existing features in your app, so this module is documented for completeness because your project is a Mac-native text workspace and may want to expose spatial previews in the future.
+> **Scope:** This module covers the macOS 27 cross-device surface as documented in RESEARCH.md §2.7: the **macOS Spatial Preview framework**, **SharePlay**-based spatial collaboration, **Quick Look on visionOS** integration from a Mac app, and the **iPhone Mirroring** window-resize refinement. None of these map to existing features in your app, so this module is documented for completeness for Mac-native apps and may want to expose spatial previews in the future.
 
 ## What Is Spatial Preview
 

@@ -158,7 +158,7 @@ The headline addition is a brand-new framework called **Core AI** (built directl
 - Many fixed model-loading/execution issues: app-group support (179732320), AOT with Xcode 27 Beta 2 (181264112), on-device specialization cache policy (169746264), inference encode blocking (175789258), control flow on dynamic-shape tensors (177354777), Metal API Validation failures (177991751), custom Metal kernels failing to load (178056451).
 - The Foundation Models Instrument in Instruments helps trace and debug Foundation Models usage — instructions, prompts, responses, token usage, inference performance. (164223804, Xcode 27 release notes)
 
-> **Note on MLX:** The Tahoe skill referenced an MLX framework; the macOS 27 What's New page describes **Core AI** as the on-device ML story, with WWDC26 session 330 covering Metal tensor optimizations. The release notes do not contain a separate "MLX" section. Treat Core AI as the successor story for on-device model integration. MLX (Apple's open-source array framework) may continue as a third-party / open-source option — that is outside Apple's release notes and is not cited here.
+> **Note on MLX:** The macOS 26 guidance referenced MLX as a third-party array framework; the macOS 27 What's New page describes **Core AI** as the on-device ML story, with WWDC26 session 330 covering Metal tensor optimizations. The release notes do not contain a separate "MLX" section. Treat Core AI as the successor story for on-device model integration. MLX (Apple's open-source array framework) may continue as a third-party / open-source option — that is outside Apple's release notes and is not cited here.
 
 ### 2.7 Continuity / cross-device
 
@@ -362,12 +362,3 @@ All claims above are backed by one or more of the following Apple Developer URLs
 - macOS: https://en.wikipedia.org/wiki/MacOS
 - macOS Golden Gate: https://en.wikipedia.org/wiki/MacOS_Golden_Gate
 
----
-
-## Notes for the SKILL.md author
-
-1. Every API name above is verified in an Apple source. If a section above says "no notable changes" or "not in release notes", the SKILL.md author should reflect that explicitly rather than padding.
-2. The macOS 27 release notes do not include a dedicated "MLX" section — the Tahoe skill referenced MLX; for macOS 27 the equivalent story is **Core AI**. The SKILL.md should reflect that.
-3. The macOS 27 release notes do not include a dedicated "Process" or "subprocess" section, nor a dedicated "Vision" section. The SKILL.md author should either omit those sections or note they had no notable changes in the official release notes.
-4. The "What's new in macOS 27" page is a higher-level, marketing-oriented companion to the release notes. Use both — release notes for API specifics, What's new for context.
-5. Beta 8 is the current build (Aug 31, 2026); expect refinements before public release in late 2026.
