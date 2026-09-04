@@ -1,5 +1,6 @@
 ---
 name: macos-golden-gate-apis
+version: 0.1.0
 description: Use when working with macOS 27 Golden Gate APIs, Xcode 27 SDK, FoundationModels Language Model protocol, Core AI, ReadableDocument/WritableDocument, NSRefreshController, App Intents entity/intent schemas, SpotlightSearchTool, Spatial Preview, WebKit for Safari 27, or Apple Silicon-only deployment.
 allowed-tools: [Read, Glob, Grep, WebFetch]
 last_verified: 2026-09-04
