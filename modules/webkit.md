@@ -20,7 +20,8 @@ import WebKit
 
 let configuration = WKWebViewConfiguration()
 configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-configuration.applicationNameForUserAgent = "YourApp/\(Bundle.main.shortVersion)"
+let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+configuration.applicationNameForUserAgent = "YourApp/\(appVersion)"
 
 let preview = WKWebView(frame: .zero, configuration: configuration)
 preview.loadHTMLString(html, baseURL: baseURL)
@@ -102,8 +103,13 @@ final class WebPreviewController {
     init(baseURL: URL) {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-        configuration.applicationNameForUserAgent = "YourApp/\(Bundle.main.shortVersion)"
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+configuration.applicationNameForUserAgent = "YourApp/\(appVersion)"
         configuration.defaultWebpagePreferences.preferredColorScheme = .auto
+        // Note: if your SwiftUI view also applies .preferredColorScheme(),
+        // the two may conflict during light/dark transitions. Prefer .light/.dark
+        // to match the SwiftUI environment, or omit this line to let WKWebView
+        // follow the system default.
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.isInspectable = true

@@ -178,9 +178,9 @@ struct NotePackage: WritableDocument {
 }
 ```
 
-#### `\.newDocument` environment value — `macOS 27.0+`, Xcode 27 SDK
+#### `DocumentGroup(newDocument:)` — `macOS 27.0+`, Xcode 27 SDK
 
-Accepts an autoclosured in-memory `ReadableDocument` so "New from Template" flows do not require disk I/O up front. (180300890)
+The `DocumentGroup` initializer accepts a `newDocument` closure that returns an in-memory `ReadableDocument` for "New from Template" flows — no disk I/O required. (180300890)
 
 ```swift
 @main
@@ -188,11 +188,12 @@ struct YourApp: App {
     var body: some Scene {
         DocumentGroup(newDocument: { EmptyNote() }) { config in
             EditorView(configuration: config)
-                .environment(\.newDocument) { /* template factory */ EmptyNote() }
         }
     }
 }
 ```
+
+> **Note:** `\.newDocument` is a **read-only** environment getter in macOS 27 — it cannot be set via `.environment(\.newDocument)`. The factory is provided through the `DocumentGroup(newDocument:)` initializer parameter above.
 
 ### SwiftUI — AsyncImage and selection
 
