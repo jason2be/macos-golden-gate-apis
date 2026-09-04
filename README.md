@@ -1,3 +1,5 @@
+English | [中文](README.zh-CN.md)
+
 # macOS Golden Gate APIs
 
 > An AI-agent skill for macOS 27 Golden Gate API reference and migration guidance.
