@@ -11,40 +11,47 @@ target_apis: ReadableDocument, WritableDocument, Document, URLDocumentConfigurat
 
 #### `ReadableDocument` and `WritableDocument` — `macOS 27.0+`, Xcode 27 SDK
 
-Protocols that replace `FileDocument` for documents with async I/O, progress reporting, and direct URL access. The two protocols combine into `Document`. `FileDocument` is deprecated; `ReferenceFileDocument` is superseded by `Document` for read-and-write cases. (158441552, 177458781, 178776840)
+Protocols that replace `FileDocument` for documents with async I/O, progress reporting, and direct URL access. The two protocols combine into `Document`. `FileDocument` is deprecated; `ReferenceFileDocument` is **likewise deprecated** (same `deprecated: 100000.0` marking in the SDK interface) — migrate it to `Document` as well. (158441552, 177458781, 178776840)
 
-**CRITICAL: The new protocols have a fundamentally different shape from `FileDocument`.** The actual API surface (verified against Apple Developer Documentation 2026-09-04) is:
+**CRITICAL: The new protocols have a fundamentally different shape from `FileDocument`.** The actual API surface (verified against the SDK swiftinterface 2026-09-06) is:
 
 ```swift
 // ReadableDocument — read-only document
 protocol ReadableDocument: AnyObject {  // MUST be a class (AnyObject)
+    associatedtype Reader : DocumentReader          // your reader type
+    typealias ReadConfiguration = DocumentReadConfiguration
     static var readableContentTypes: [UTType] { get }
-    func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocumentReader<Snapshot>
-    @MainActor func apply(snapshot: sending Snapshot, previous: sending Snapshot?) async throws
+    func reader(configuration: sending ReadConfiguration) -> sending Self.Reader
+    @MainActor func apply(snapshot: sending Self.Reader.Snapshot,
+                          previous: sending Self.Reader.Snapshot?) async throws
 }
 
 // WritableDocument — adds write capability
 protocol WritableDocument: AnyObject {
+    associatedtype Writer : DocumentWriter          // your writer type
+    typealias WriteConfiguration = DocumentWriteConfiguration
     static var writableContentTypes: [UTType] { get }
-    func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<Snapshot>
-    @MainActor func snapshot(contentType: UTType) async throws -> sending Snapshot
+    func writer(configuration: sending WriteConfiguration) -> sending Self.Writer
+    @MainActor func snapshot(contentType: UTType) async throws -> sending Self.Writer.Snapshot
 }
 
 // Document — combines both
 protocol Document: ReadableDocument, WritableDocument {}
 ```
 
+`FileWrapperDocumentReader<Snapshot>` / `FileWrapperDocumentWriter<Snapshot>` are Apple's concrete `DocumentReader`/`DocumentWriter` implementations — conform your `Reader`/`Writer` associated types to them when your snapshot round-trips through `FileWrapper` (the common case shown in the examples below).
+
 **The `Snapshot` type is whatever the conforming type chooses** (`String`, `Data`, `MySnapshot`, etc.). The lifecycle is:
-1. SwiftUI calls `reader(configuration:)` to get a `FileWrapperDocumentReader<Snapshot>`.
+1. SwiftUI calls `reader(configuration:)` to get your `Reader` (commonly a `FileWrapperDocumentReader<Snapshot>`).
 2. The reader's closure transforms a `FileWrapper` to a `Snapshot` (synchronously, off the main actor if the closure is marked `@concurrent`).
 3. SwiftUI then calls `@MainActor apply(snapshot:previous:)` on the document to install the snapshot.
-4. On save, SwiftUI calls `@MainActor snapshot(contentType:)` to get the current state, then `writer(configuration:)` to get a `FileWrapperDocumentWriter<Snapshot>` whose closure produces a `FileWrapper`.
+4. On save, SwiftUI calls `@MainActor snapshot(contentType:)` to get the current state, then `writer(configuration:)` to get your `Writer` (commonly a `FileWrapperDocumentWriter<Snapshot>`) whose closure produces a `FileWrapper`.
 
-**There is no `init(configuration:)` on these protocols.** The legacy `FileDocument.init(configuration:)` pattern is **completely gone**.
+**There is no `init(configuration:)` on these new protocols.** The legacy `init(configuration:)` survives only inside the **deprecated** `FileDocument` — new code doesn't get it.
 
 #### `URLDocumentConfiguration` — `macOS 27.0+`, Xcode 27 SDK
 
-`@MainActor`-isolated `@Observable` reference type that replaces `ReferenceFileDocumentConfiguration`. No longer conforms to `Sendable`; closures that previously captured it in `Sendable` contexts must drop the constraint. (180302075)
+`@MainActor`-isolated `@Observable` reference type that replaces `ReferenceFileDocumentConfiguration`. Real members: `fileURL: URL?`, `lastContentModificationDate: Date?`, `makeFileCoordinator() -> sending NSFileCoordinator` — nothing else. It is `@MainActor`-isolated, so off-main access is rejected by isolation checks (an `@MainActor final class` is implicitly Sendable; what bites in practice is the isolation, not `Sendable` conformance). (180302075)
 
 ```swift
 import SwiftUI
@@ -56,9 +63,12 @@ final class DataViewModel {
     var lastSavedAt: Date?
 
     func configure(_ configuration: URLDocumentConfiguration) {
-        configuration.didUndoChange = { [weak self] _ in
-            self?.refreshFromDisk()
+        // URLDocumentConfiguration exposes file metadata only.
+        if let date = configuration.lastContentModificationDate {
+            lastSavedAt = date
         }
+        // The document content itself lives in your `Document` type —
+        // hand it to the view model from the DocumentGroup editor closure.
     }
 }
 ```
@@ -155,45 +165,69 @@ struct ExportPanel: View {
 }
 ```
 
-#### `FileWrapperDocumentWriter.makeFileWrapper(previous:)` — `macOS 27.0+`, Xcode 27 SDK
+#### `FileWrapperDocumentWriter.makeFileWrapper` closure gains `previous:` — `macOS 27.0+`, Xcode 27 SDK
 
-The closure now receives a `previous: FileWrapper?` parameter so package-format documents can mutate bundles in place rather than always replacing. (180301399)
+The writer's `makeFileWrapper` closure now receives a `previous: FileWrapper?` parameter so package-format documents can mutate bundles in place rather than always replacing. (180301399)
 
 ```swift
-struct NotePackage: WritableDocument {
+final class NotePackage: WritableDocument {   // ReadableDocument is AnyObject-constrained: class required
     static let writableContentTypes: [UTType] = [.package]
 
     var markdown: String
     var attachments: [URL]
 
-    func makeFileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        var bundle = configuration.existingFile ?? FileWrapper(directoryWithFileWrappers: [:])
-        if let existing = configuration.existingFile {
-            bundle = try Self.mutating(existing, with: self)
-        } else {
-            bundle = try Self.building(with: self)
+    // Required by WritableDocument — no default implementation.
+    @MainActor func snapshot(contentType: UTType) async throws -> sending Void {}
+
+    func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<Void> {
+        FileWrapperDocumentWriter(configuration) { @concurrent _, previous in
+            if let previous {
+                // Mutate the existing bundle in place (keeps "edited by" tracking).
+                try Self.mutating(previous, with: self)
+            } else {
+                try Self.building(with: self)
+            }
         }
-        return bundle
     }
 }
 ```
 
-#### `DocumentGroup(newDocument:)` — `macOS 27.0+`, Xcode 27 SDK
+#### `DocumentGroup` + `NewDocumentAction` for "New from Template" — `macOS 27.0+`, Xcode 27 SDK
 
-The `DocumentGroup` initializer accepts a `newDocument` closure that returns an in-memory `ReadableDocument` for "New from Template" flows — no disk I/O required. (180300890)
+For in-memory "New from Template" flows: create documents through `DocumentGroup(allowCreating:editor:makeDocument:)` / `(viewer:makeReadableDocument:)` (factories are `@MainActor`), and trigger templates via the `\.newDocument` environment value — a `NewDocumentAction` whose macOS 27 overloads accept an `@autoclosure` returning a `ReadableDocument`, so the new document never touches disk. (180300890)
 
 ```swift
 @main
 struct YourApp: App {
     var body: some Scene {
-        DocumentGroup(newDocument: { EmptyNote() }) { config in
-            EditorView(configuration: config)
+        DocumentGroup(allowCreating: true, editor: { document in
+            // editor receives the Document instance (not the configuration).
+            EditorView(document: document)
+        }, makeDocument: { configuration, context in
+            EmptyNote()
+        })
+        .commands {
+            CommandGroup(replacing: .newItem) {
+                TemplateMenuButton()
+            }
         }
+    }
+}
+
+struct TemplateMenuButton: View {
+    // NewDocumentAction has no public init — get it from the environment.
+    @Environment(\.newDocument) private var newDocument
+
+    var body: some View {
+        Button("New from Template") {
+            newDocument(EmptyNote())   // @autoclosure → in-memory ReadableDocument
+        }
+        .keyboardShortcut("n")
     }
 }
 ```
 
-> **Note:** `\.newDocument` is a **read-only** environment getter in macOS 27 — it cannot be set via `.environment(\.newDocument)`. The factory is provided through the `DocumentGroup(newDocument:)` initializer parameter above.
+> **Note:** the legacy `DocumentGroup(newDocument:editor:)` initializers still exist but are bound to the deprecated `FileDocument`/`ReferenceFileDocument` protocols — don't use them for new-model documents. And `\.newDocument` is a **read-only** environment getter in macOS 27 — it cannot be set via `.environment(\.newDocument)`.
 
 ### SwiftUI — AsyncImage and selection
 
@@ -270,7 +304,7 @@ func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocu
 }
 ```
 
-**NOTE:** There is no `DocumentReader` / `DocumentWriter` protocol in Apple's SwiftUI framework. The actual types are `FileWrapperDocumentReader<Snapshot>` and `FileWrapperDocumentWriter<Snapshot>` — concrete generic types wrapping a closure. If your code references a `DocumentReader` / `DocumentWriter` protocol, that is a project-local abstraction, not Apple API. (180302015)
+**NOTE:** `DocumentReader` / `DocumentWriter` **are** real Apple protocols (SDK swiftinterface: `public protocol DocumentReader<Snapshot>` / `public protocol DocumentWriter<Snapshot>`, each with `@concurrent` async I/O requirements, per 180302015). `FileWrapperDocumentReader<Snapshot>` and `FileWrapperDocumentWriter<Snapshot>` are Apple's concrete generic implementations of them — the ones you use when your `Snapshot` round-trips through `FileWrapper`. Custom reader/writer types only need to conform to the base protocols. (180302015)
 
 #### `@MainActor` `DocumentGroup` factory closures — `macOS 27.0+`, Xcode 27 SDK
 
@@ -280,11 +314,12 @@ func reader(configuration: sending ReadConfiguration) -> sending FileWrapperDocu
 @main
 struct SampleApp: App {
     var body: some Scene {
-        DocumentGroup { @MainActor in
-            SampleDocument(initialDraft: "")
-        } editor: { config in
-            EditorView(configuration: config)
-        }
+        DocumentGroup(viewer: { document in
+            SummaryView(document: document)
+        }, makeReadableDocument: { configuration, context in
+            // @MainActor closure — direct access to URLDocumentConfiguration, no isolation hops.
+            SampleDocument(initialDraft: configuration.fileURL?.lastPathComponent ?? "")
+        })
     }
 }
 ```
@@ -390,18 +425,13 @@ struct HueSlider: View {
 
 #### `NSRefreshController` — `macOS 27.0+`, Xcode 27 SDK
 
-Pull-to-refresh controller for `NSScrollView`. Set via `NSScrollView.refreshController`. Has `beginRefreshing()` and `endRefreshing()`. Replaces any custom pull-to-refresh implementation. (160867808)
+Pull-to-refresh controller for `NSScrollView`. Set via `NSScrollView.refreshController`. Has `beginRefreshing()` and `endRefreshing()`. Replaces any custom pull-to-refresh implementation. Configure a `target` + `action` — the header declares **no closure-based initializer**. (160867808)
 
 ```swift
 let scrollView = NSScrollView()
-let controller = NSRefreshController { [weak scrollView] in
-    Task {
-        await DataStore.shared.refresh()
-        await MainActor.run {
-            scrollView?.refreshController?.endRefreshing()
-        }
-    }
-}
+let controller = NSRefreshController()
+controller.target = DataStore.shared
+controller.action = #selector(DataStore.refreshCompleted(_:))
 scrollView.refreshController = controller
 ```
 
@@ -442,8 +472,18 @@ final class CustomTextView: NSTextView {
 
     @objc private func handleLinkTap(_ recognizer: NSClickGestureRecognizer) {
         let location = recognizer.location(in: self)
-        guard let candidate = candidateListForSelection(at: location) else { return }
-        openURL(candidate)
+        // Resolve the link attribute at the tap location (no
+        // candidateListForSelection(at:) API exists in AppKit).
+        guard
+            let container = textContainer,
+            let characterIndex = layoutManager?.characterIndex(
+                for: location,
+                in: container,
+                fractionOfDistanceBetweenInsertionPoints: nil)
+        else { return }
+        guard let url = textStorage?.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL
+        else { return }
+        openURL(url)
     }
 }
 ```
@@ -466,11 +506,14 @@ By default only the initial hit-tested view hierarchy activates gestures until a
 
 - Per-view: `NSView.exclusiveGestureBehavior`.
 - App-wide: `Info.plist` key `NSViewGestureRecognizerIsExclusive`.
-- `NSGestureRecognizerSuppressesMainMenuActions` allows menu actions to fire during gestures. (173551081)
+- During gestures: `NSGestureRecognizerSuppressesMainMenuActions` lets menu actions fire. (173551081)
 
 ```swift
-inspectorView.exclusiveGestureBehavior = .allowConcurrent
+// Non-exclusive: this view and its subviews do not claim exclusivity.
+inspectorView.exclusiveGestureBehavior = .notExclusive
 
+// Keep menu actions firing while a gesture is active (KVC on an
+// undocumented key — verify on your target OS before relying on it).
 NSClickGestureRecognizer(target: self, action: #selector(handleClick(_:)))
     .setValue(true, forKey: "suppressesMainMenuActions")
 ```
@@ -486,7 +529,7 @@ UserDefaults.standard.set(true, forKey: "NSGestureRecognizerCrashOnMissingOverri
 
 #### `NSScrollView` touch constraints — `macOS 27.0+`, Xcode 27 SDK
 
-New properties on `NSScrollView` for constraining the touches-needed-to-scroll threshold plus `scrollGestureForFailureRelationship`. (164924201)
+New properties on `NSScrollView` for constraining the touches-needed-to-scroll threshold plus the read-only `scrollGestureForRelationships` gesture recognizer. (164924201)
 
 ### AppKit — windows and menus
 
@@ -525,7 +568,7 @@ For apps linked on the macOS 27 SDK, both symbol and non-symbol menu item images
 ```swift
 let item = NSMenuItem(title: "Refresh", action: #selector(refresh), keyEquivalent: "r")
 item.image = NSImage(systemSymbolName: "arrow.clockwise", accessibilityDescription: "Refresh")
-item.preferredImageVisibility = .always
+item.preferredImageVisibility = .visible
 menu.addItem(item)
 ```
 
@@ -533,13 +576,13 @@ menu.addItem(item)
 
 ### Pattern 1 — Migrating `ReferenceFileDocument` to `Document` + `URLDocumentConfiguration`
 
-Your app's document type currently uses `ReferenceFileDocument`. Under macOS 27 the recommended shape is `Document` with a separate `@Observable` `@MainActor` view-model holding the configuration. The pattern below shows how to keep undo/redo working.
+Your app's document type currently uses `ReferenceFileDocument`. Under macOS 27 the recommended shape is a `Document` conforming type that owns the snapshot round-trip, plus a separate `@Observable` `@MainActor` view-model that receives file metadata from `URLDocumentConfiguration` (which exposes `fileURL` / `lastContentModificationDate` / `makeFileCoordinator()` only — the document content lives in your `Document` type).
 
 ```swift
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct MyDocument: Document {
+final class MyDocument: Document {
     static let readableContentTypes: [UTType] = [.markdown, .plainText]
     static let writableContentTypes: [UTType] = [.markdown]
 
@@ -563,7 +606,7 @@ struct MyDocument: Document {
     }
 
     func writer(configuration: sending WriteConfiguration) -> sending FileWrapperDocumentWriter<String> {
-        FileWrapperDocumentWriter(configuration) { @concurrent text in
+        FileWrapperDocumentWriter(configuration) { @concurrent text, previous in
             let data = Data(text.utf8)
             return FileWrapper(regularFileWithContents: data)
         }
@@ -574,20 +617,20 @@ struct MyDocument: Document {
 @MainActor
 final class DocumentViewModel {
     var text: String
-    private weak var configuration: URLDocumentConfiguration?
+    private(set) var documentURL: URL?
+    private(set) var lastSavedAt: Date?
 
     init(text: String) {
         self.text = text
     }
 
-    func bind(_ configuration: URLDocumentConfiguration) {
-        self.configuration = configuration
-        configuration.didUndoChange = { [weak self] undoManager in
-            self?.text = configuration.document.text
-            undoManager?.registerUndo(withTarget: self) { vm in
-                configuration.didUndoChange = { _ in /* restore */ }
-            }
-        }
+    /// Called from the DocumentGroup editor closure, which is @MainActor:
+    /// copy the file metadata you need out of the configuration and keep a
+    /// reference to the document content for presentation.
+    func bind(_ configuration: URLDocumentConfiguration, document: MyDocument) {
+        documentURL = configuration.fileURL
+        lastSavedAt = configuration.lastContentModificationDate
+        text = document.text
     }
 }
 ```
@@ -606,18 +649,20 @@ final class RefreshableDocumentListController: NSViewController {
     override func loadView() {
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
-        scrollView.refreshController = NSRefreshController { [weak self] in
-            self?.refresh()
-        }
+        // Target/action — there is no closure-based initializer.
+        let controller = NSRefreshController()
+        controller.target = self
+        controller.action = #selector(handleRefresh(_:))
+        scrollView.refreshController = controller
         view = scrollView
     }
 
-    private func refresh() {
+    @objc private func handleRefresh(_ sender: NSRefreshController) {
         Task {
             await DataStore.shared.reloadFromDisk()
-            await MainActor.run { [weak scrollView] in
-                scrollView?.refreshController?.endRefreshing()
-                tableView.reloadData()
+            await MainActor.run { [weak self] in
+                self?.scrollView.refreshController?.endRefreshing()
+                self?.tableView.reloadData()
             }
         }
     }
@@ -648,12 +693,17 @@ final class ClickableLinkTextView: NSTextView {
 
     @objc private func handleLinkTap(_ recognizer: NSClickGestureRecognizer) {
         let point = recognizer.location(in: self)
-        guard let candidates = candidateListForSelection(at: point) else { return }
-        for candidate in candidates {
-            if let url = candidate.url {
-                NSWorkspace.shared.open(url)
-                return
-            }
+        // Resolve NSAttributedString.Key.link at the tap location —
+        // `candidateListForSelection(at:)` does not exist in AppKit.
+        guard
+            let container = textContainer,
+            let characterIndex = layoutManager?.characterIndex(
+                for: point,
+                in: container,
+                fractionOfDistanceBetweenInsertionPoints: nil)
+        else { return }
+        if let url = textStorage?.attribute(.link, at: characterIndex, effectiveRange: nil) as? URL {
+            NSWorkspace.shared.open(url)
         }
     }
 }
@@ -696,7 +746,7 @@ enum AppMenuFactory {
                                  keyEquivalent: "n")
         newItem.image = NSImage(systemSymbolName: "doc.badge.plus",
                                 accessibilityDescription: "New document")
-        newItem.preferredImageVisibility = .always
+        newItem.preferredImageVisibility = .visible
         menu.addItem(newItem)
         menu.addItem(.separator())
         return menu
@@ -711,12 +761,12 @@ enum AppMenuFactory {
 - **`FileDocument` deprecated** → migrate to `Document` (combined) or `ReadableDocument` + `WritableDocument`. Apps currently using `ReferenceFileDocument` should plan for migration to `Document` + a separate `@MainActor` `@Observable` configuration model. (178776840, 180302075)
 - **`FileWrapperDocumentWriter.makeFileWrapper` gains `previous:` parameter** — the closure signature changes for any package-format document. Add the new parameter and adopt in-place mutation for bundle packages. (180301399)
 - **Macro-based `@State`** — audit for the two broken patterns: (a) `init` assignment plus declaration default, (b) extension-memberwise-`init` synthesis when all stored members are private and any is `@State`. Back-deploys to iOS 17-aligned OSes but compiles against the new Xcode 27 SDK. (105893279)
-- **Menu bar images hidden by default** — symbols no longer appear in menu bars / context menus by default. Use `labelStyle(.titleAndIcon)` in SwiftUI or `NSMenuItem.preferredImageVisibility = .always` in AppKit to preserve icons for items that need them. (170480710, 170477566)
+- **Menu bar images hidden by default** — symbols no longer appear in menu bars / context menus by default. Use `labelStyle(.titleAndIcon)` in SwiftUI or `NSMenuItem.preferredImageVisibility = .visible` in AppKit to preserve icons for items that need them. (170480710, 170477566)
 - **Selectable `Text` + `TextRenderer`** — previously `TextRenderer` had no effect on selectable text; this is now supported on macOS 27 SDK. (158160386)
 - **`Slider` no longer wraps `NSSlider`** — any custom `NSSlider` subclass your app relies on will not apply. Audit custom slider styling. (173990195)
 - **`TabView` in inspectors uses `.tabs` picker style automatically** — explicit `.pickerStyle(.tabs)` may no longer be needed. (170678002)
 - **`TextInputBorderShape`** — `.squareBorder` / `.roundedBorder` soft-deprecated. Adopt `.bordered`. (173362083)
-- **`URLDocumentConfiguration` no longer `Sendable`** — drop `Sendable` constraints from closures or types that captured it. (180302075)
+- **`URLDocumentConfiguration` is `@MainActor`-isolated** — access it only from the main actor (its real members: `fileURL`, `lastContentModificationDate`, `makeFileCoordinator()`). (180302075)
 - **`@concurrent` replaces `nonisolated`** on `DocumentReader.read` / `DocumentWriter.write` async methods — same fix should be applied to custom conforming types. (180302015)
 - **`@Entry` warning** — if you store default class instances or closures in the environment, refactor to factories or plain values. (175902616)
 - **`\.newDocument` environment value** — adopt for "New from Template" flows that should not hit disk up front. (180300890)
@@ -735,7 +785,7 @@ enum AppMenuFactory {
 - **`NSTitlebarAccessoryViewController` overdraw** — by default, accessories may draw outside their bounds. (180962967)
 - **`NSTextView.menuForEvent:` Layout Orientation** — Layout Orientation menu item moves into Font submenu for apps linking the macOS 27 SDK. (177605020)
 - **`NSMenu` images hidden by default** — both symbol and non-symbol images hidden by default; use `NSMenuItem.preferredImageVisibility` to keep specific items visible. (170477566, 179374305, 179936632)
-- **`NSScrollView` touch constraints** — new properties for constraining touches-needed-to-scroll + `scrollGestureForFailureRelationship`. (164924201)
+- **`NSScrollView` touch constraints** — new properties for constraining touches-needed-to-scroll + the read-only `scrollGestureForRelationships`. (164924201)
 
 ## Common Mistakes
 
@@ -763,46 +813,46 @@ struct Counter: View {
 }
 ```
 
-### Mistake 2 — Capturing `URLDocumentConfiguration` across actor boundaries
+### Mistake 2 — Accessing `URLDocumentConfiguration` off the main actor
 
-`URLDocumentConfiguration` is `@MainActor` and no longer `Sendable`. Treating it as `Sendable` and crossing an actor boundary with it will not compile under strict concurrency.
+`URLDocumentConfiguration` is `@MainActor`-isolated — assigning its properties from a detached task or a nonisolated context is rejected by isolation checks under strict concurrency. Do the work on the main actor.
 
 ```swift
 // Wrong.
 @MainActor
-func bind(_ configuration: URLDocumentConfiguration<Doc>) {
+func bind(_ configuration: URLDocumentConfiguration) {
     Task.detached {
-        configuration.didUndoChange = { _ in /* … */ }   // crossing actor
+        configuration.lastContentModificationDate = nil   // off-main access
     }
 }
 
 // Right.
 @MainActor
-func bind(_ configuration: URLDocumentConfiguration<Doc>) {
-    configuration.didUndoChange = { _ in /* … */ }   // already on main actor
+func bind(_ configuration: URLDocumentConfiguration) {
+    configuration.lastContentModificationDate = nil   // already on main actor
 }
 ```
 
-### Mistake 3 — Forgetting `previous: FileWrapper?` in `makeFileWrapper`
+### Mistake 3 — Ignoring `previous: FileWrapper?` in the writer closure
 
-Package-format documents must mutate the previous file wrapper in place; ignoring the new parameter produces bundle churn on every save and breaks macOS document browsers' "edited by" tracking.
+Package-format documents must mutate the previous file wrapper in place; ignoring the closure's `previous:` parameter produces bundle churn on every save and breaks macOS document browsers' "edited by" tracking. (`makeFileWrapper` is the `FileWrapperDocumentWriter` closure parameter, not a method on your document type.)
 
 ```swift
-// Wrong.
-func makeFileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+// Wrong — always builds a fresh bundle, drops incremental mutation.
+FileWrapperDocumentWriter(configuration) { @concurrent snapshot, _ in
     let bundle = FileWrapper(directoryWithFileWrappers: [:])
-    try Self.populate(bundle, with: self)
+    try Self.populate(bundle, with: snapshot)
     return bundle
 }
 
-// Right.
-func makeFileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-    let bundle = configuration.existingFile ?? FileWrapper(directoryWithFileWrappers: [:])
-    if let previous = configuration.existingFile {
-        try Self.mutate(previous, with: self)
-    } else {
-        try Self.populate(bundle, with: self)
+// Right — reuse `previous` when present.
+FileWrapperDocumentWriter(configuration) { @concurrent snapshot, previous in
+    if let previous {
+        try Self.mutate(previous, with: snapshot)
+        return previous
     }
+    let bundle = FileWrapper(directoryWithFileWrappers: [:])
+    try Self.populate(bundle, with: snapshot)
     return bundle
 }
 ```

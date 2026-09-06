@@ -63,7 +63,7 @@
 
 ```bash
 # Claude Code / opencode
-cp -r macos-golden-gate-apis ~/.agents/skills/macos-development/
+cp -r macos-golden-gate-apis ~/.agents/skills/
 
 # 或针对特定项目
 cp -r macos-golden-gate-apis /path/to/your/project/.agents/skills/
@@ -79,10 +79,10 @@ Agent 会在相关场景自动发现并加载 `SKILL.md`。
 
 除 Apple 网页外，做相关开发的机器在相同位置几乎都有同样的离线证据——经许可后可用，注意以本机实际版本为准（时效规则在 `SKILL.md`）：
 
-- **Xcode SDK swiftinterface**（签名/可用性的最终权威）：当前 Xcode 下 `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface`。
+- **Xcode SDK swiftinterface**（SwiftUI/Foundation 等 Swift overlay 框架的最终权威；AppKit 等 ObjC 框架的 27 增量不在 interface 里，以 `AppKit.framework/Headers/*.h` 为准）：当前 Xcode 下 `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface`。
 - **本地开发者文档资产**（Deprecated/讨论细节）：`/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/<hash>.asset/AssetData/documentation-db/index.sql`——只读 SQLite；`<hash>` 目录因机器而异。
 
-SwiftUI 查询由 `SKILL.md` 的主题索引路由；Tahoe 世代的 SwiftUI 平台差异（Table、`.inspector`、窗口工具栏）在本机装有 **axiom-macos** 技能时交由其 `skills/swiftui-differences.md`。
+SwiftUI 查询由 `SKILL.md` 的主题索引路由；Tahoe 世代的 SwiftUI 平台差异（Table、`.inspector`、窗口工具栏）在本机装有 **axiom-macos** 技能时交由其 `skills/swiftui-differences.md`——未安装时按一般 macOS 经验处理，并回本技能查 27 增量。
 
 ## Beta 文档声明
 

@@ -10,8 +10,9 @@
 > frontmatter `review_by: 2026-10-31` 仅为兜底。
 
 > **本机证据源（SKILL.md「Local Evidence」的底账）**：本文件 §2 的 API 断言除标注网络 URL 外，
-> 均可在开发者本机同位置复核——① Xcode 27 SDK 的 `MacOSX27.0.sdk` swiftinterface（SwiftUI/AppKit/
-> Foundation 等逐框架同目录模式）；② `/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/`
+> 均可在开发者本机同位置复核——① Xcode 27 SDK 的 `MacOSX27.0.sdk` swiftinterface（SwiftUI/Foundation
+> 等 Swift overlay 框架逐框架同目录模式；**AppKit 等 ObjC 框架的 27 增量不在 `AppKit.swiftinterface`
+> 里，以 `AppKit.framework/Headers/*.h` 为准**）；② `/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/`
 > 下的文档资产库（index.sql，Deprecated/讨论细节）。两源随机器版本浮动，复核前先确认本机实际
 > SDK/资产版本——见 SKILL.md「Local Evidence」的时效规则。
 
@@ -46,7 +47,7 @@ Source: [macOS 27 release notes — SwiftUI](https://developer.apple.com/documen
 
 **New views / protocols / patterns**
 - `ReadableDocument` and `WritableDocument` protocols supporting async read/write, progress reporting, and direct URL access — preferred over `ReferenceFileDocument`. (158441552)
-- `Document` protocol combines `ReadableDocument` + `WritableDocument`; `FileDocument` is now deprecated, `ReferenceFileDocument` is superseded. (177458781, 178776840)
+- `Document` protocol combines `ReadableDocument` + `WritableDocument`; `FileDocument` is now deprecated, `ReferenceFileDocument` is likewise deprecated (same interface marking). (177458781, 178776840)
 - `URLDocumentConfiguration` is `@MainActor`-isolated `@Observable` reference type. (180302075)
 - `TextInputBorderShape` type + `textInputBorderShape(_:)` modifier; `.squareBorder` / `.roundedBorder` are soft-deprecated in favor of `.bordered`. (173362083)
 - `TabsPickerStyle` for pickers representing tab-based navigation; VoiceOver reads as "tabs". (173211711)
@@ -97,7 +98,7 @@ Source: [macOS 27 release notes — AppKit](https://developer.apple.com/document
 - **Exclusive gesture behavior** — only the initial hit-tested view hierarchy activates gestures until all terminate. Opt-out via `NSView.exclusiveGestureBehavior`, app-wide `Info.plist` key `NSViewGestureRecognizerIsExclusive`, and `NSGestureRecognizerSuppressesMainMenuActions` to allow menu actions during gestures. (173551081)
 - **Stuck-gesture timeout** — auto-cancels stuck gestures; `NSCrashOnStuckGestureTimeout` user default lets you crash to debug. (175705302)
 - **Diagnostic user default** `NSGestureRecognizerCrashOnMissingOverrides`. (176396492)
-- **`NSScrollView`** new properties for constraining touches-needed-to-scroll + `scrollGestureForFailureRelationship`. (164924201)
+- **`NSScrollView`** new properties for constraining touches-needed-to-scroll + the read-only `scrollGestureForRelationships` gesture recognizer (NSScrollView.h:151). (164924201)
 - **`NSTitlebarAccessoryViewController`** now allowed to draw outside bounds by default (shadows, interactive glass). Clipped only during reveal animations or when `hidden`. (180962967)
 - **`NSTextView.menuForEvent:`** — Layout Orientation menu item moves into the Font submenu of the context menu (applies only when linking on macOS 27 SDK). (177605020)
 - **`NSMenu`** — both symbol and non-symbol menu item images are now hidden by default for apps linked on macOS 27 SDK. `NSMenuItem.preferredImageVisibility` lets you keep specific items visible. (179374305, 170477566, 179936632)
@@ -130,7 +131,7 @@ Source: [macOS 27 release notes](https://developer.apple.com/documentation/macos
 - **SE-0508 source break** — computed property with both an `init` accessor and an array/dictionary literal initial value no longer compiles if the getter is declared before the `init` accessor. Workaround: swap order. (180969028)
 - New **`@concurrent` attribute for off-main async methods** — `DocumentReader`/`DocumentWriter` async methods use `@concurrent` instead of `nonisolated` to defeat approachable-concurrency's main-actor inference. (180302015)
 - **`DocumentGroup` factory closures** are `@MainActor`-isolated; closures can access `URLDocumentConfiguration` without isolation hops. (180302065)
-- `URLDocumentConfiguration` is `@MainActor`-isolated `@Observable` reference type and no longer conforms to `Sendable`. (180302075)
+- `URLDocumentConfiguration` is `@MainActor`-isolated `@Observable` reference type — off-main access is rejected by isolation checks (an `@MainActor final class` is implicitly Sendable; the binding is isolation, not `Sendable`). (180302075)
 - **LLDB** can now inspect data types with `~Copyable` fields in standard library and system frameworks (Xcode 27 Beta 4). (176282041)
 - **LLDB** ships with an MCP server (`lldb-mcp`) (Xcode 27 Beta 2). (176901842)
 - **LLDB** `language swift task tree` command for inspecting Swift tasks (Xcode 27 Beta 1). (169471480)
@@ -239,7 +240,7 @@ There is no Apple-published Vision framework release-note change list that could
 
 1. **Intel / Rosetta transition** — final macOS release with full Rosetta 2; subsequent releases drop it. Audit any third-party frameworks still building Intel-only or as universal binaries. ([Rosetta deprecation news](https://developer.apple.com/news/?id=w5ngl9k2))
 2. **`@State` macro rewrite** — Xcode 27's macro-based `@State` back-deploys to iOS 17-aligned OSes, but breaks two patterns: (a) assigning `@State` in `init` while also providing a default value at declaration; (b) using the synthesized private memberwise init via an extension when all stored members are private and any of them is `@State`. ([SwiftUI](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))
-3. **`FileDocument` is deprecated**, prefer `Document` / `ReadableDocument` / `WritableDocument`. `ReferenceFileDocument` remains available. ([SwiftUI](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))
+3. **`FileDocument` and `ReferenceFileDocument` are both deprecated** (SDK interface marks both `deprecated: 100000.0`; messages "Conform your type to Document instead." / "Use Document protocol instead."), prefer `Document` / `ReadableDocument` / `WritableDocument`. ([SwiftUI](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))
 4. **`FileWrapperDocumentWriter.makeFileWrapper`** now receives `previous: FileWrapper?` — closure signature change. ([SwiftUI](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))
 5. **Menu bar / context menu images hidden by default** — SwiftUI hides symbol menu item images by default; AppKit hides both symbol and non-symbol by default for macOS 27 SDK links. Use `NSMenuItem.preferredImageVisibility` or `labelStyle(.titleAndIcon)` to opt back in. ([SwiftUI](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes), [AppKit](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))
 6. **`NSTextSelectionManager` in NSTextView** — `NSTextView` now uses gesture-recognizer-based selection internally. Existing `mouseDown:` overrides keep working via binary-compatible fallback, but new code should use `NSGestureRecognizer` subclasses. ([AppKit](https://developer.apple.com/documentation/macos-release-notes/macos-27-release-notes))

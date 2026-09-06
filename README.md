@@ -63,7 +63,7 @@ Copy this directory to your agent's skills folder:
 
 ```bash
 # For Claude Code / opencode
-cp -r macos-golden-gate-apis ~/.agents/skills/macos-development/
+cp -r macos-golden-gate-apis ~/.agents/skills/
 
 # Or for a specific project
 cp -r macos-golden-gate-apis /path/to/your/project/.agents/skills/
@@ -79,10 +79,10 @@ Read `RESEARCH.md` for the full API landscape, or jump to a specific `modules/*.
 
 Beyond Apple web pages, developer machines doing related work almost always carry the same offline evidence at the same locations — usable with permission, mind the installed versions (timeliness rules in `SKILL.md`):
 
-- **Xcode SDK swiftinterface** (final authority for signatures/availability): `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface` under the active Xcode.
+- **Xcode SDK swiftinterface** (final authority for Swift-overlay frameworks like SwiftUI/Foundation; ObjC frameworks' 27 increments live in `AppKit.framework/Headers/*.h` instead): `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface` under the active Xcode.
 - **Local Developer Documentation asset** (deprecation/discussion detail): `/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/<hash>.asset/AssetData/documentation-db/index.sql` — read-only SQLite; the `<hash>` directory varies per machine.
 
-SwiftUI queries are routed by the topic index in `SKILL.md`; Tahoe-era SwiftUI platform differences (Table, `.inspector`, window toolbars) defer to the **axiom-macos** skill (`skills/swiftui-differences.md`) when installed.
+SwiftUI queries are routed by the topic index in `SKILL.md`; Tahoe-era SwiftUI platform differences (Table, `.inspector`, window toolbars) defer to the **axiom-macos** skill (`skills/swiftui-differences.md`) when installed — if it is not installed, fall back to general macOS experience plus this skill's 27 deltas.
 
 ## Beta Documentation Notice
 

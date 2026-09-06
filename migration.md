@@ -26,12 +26,12 @@ The breaking-changes list is intentionally compact: it only enumerates items tha
 
 ## Tahoe (26) → Golden Gate (27) Breaking Changes
 
-1. `FileDocument` deprecated → use `Document` / `ReadableDocument` / `WritableDocument`. `ReferenceFileDocument` is superseded. **IMPORTANT: The new protocols have a fundamentally different shape from `FileDocument` — they use reader/writer closures returning `FileWrapperDocumentReader<Snapshot>` / `FileWrapperDocumentWriter<Snapshot>`, not synchronous `init(configuration:)` / `fileWrapper(snapshot:configuration:)` methods. See `modules/swiftui-appkit.md` §Document Protocols for the actual API.** (177458781, 178776840)
+1. `FileDocument` deprecated → use `Document` / `ReadableDocument` / `WritableDocument`. `ReferenceFileDocument` is **deprecated as well** (same interface marking, message "Use Document protocol instead."). **IMPORTANT: The new protocols have a fundamentally different shape from `FileDocument` — they use reader/writer closures returning `FileWrapperDocumentReader<Snapshot>` / `FileWrapperDocumentWriter<Snapshot>`, not synchronous `init(configuration:)` / `fileWrapper(snapshot:configuration:)` methods. See `modules/swiftui-appkit.md` § "SwiftUI — document model" for the actual API.** (177458781, 178776840)
 2. `FileWrapperDocumentWriter.makeFileWrapper` closure signature gained `previous: FileWrapper?` so package documents can mutate in place. (180301399)
 3. `@State` macro rewrite (Xcode 27, back-deploys to iOS 17-aligned OSes) — 2 compile-time breaks:
    - Assigning in `init` while also providing a default at declaration no longer compiles.
    - Synthesized private memberwise init via an extension is disabled when any stored member is private and uses `@State`.
-4. `URLDocumentConfiguration` is no longer `Sendable` (now `@MainActor`-isolated `@Observable`) — drop capture in `Sendable` closures. (180302075)
+4. `URLDocumentConfiguration` is `@MainActor`-isolated `@Observable` — don't capture or use it off the main actor (isolation checks reject it; this is not a `Sendable` change). (180302075)
 5. `NSTextView` selection now uses `NSTextSelectionManager` (gesture-recognizer-based) rather than `NSEvent` mouse overrides. Existing `mouseDown:` overrides keep working via a binary-compatible fallback. (163365571)
 6. `NSMenu` hides menu item images by default for apps linked on macOS 27 SDK — both symbol and non-symbol. Use `NSMenuItem.preferredImageVisibility` to opt back in; SwiftUI `Menu`s should use `labelStyle(.titleAndIcon)` for icons. (170477566, 179374305)
 7. Exclusive gesture behavior is now the default — only the initial hit-tested hierarchy activates gestures until all terminate. Opt-out via `NSView.exclusiveGestureBehavior`, app-wide `Info.plist` key `NSViewGestureRecognizerIsExclusive`, or `NSGestureRecognizerSuppressesMainMenuActions`. (173551081)
