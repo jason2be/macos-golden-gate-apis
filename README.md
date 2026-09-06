@@ -81,6 +81,8 @@ Read `RESEARCH.md` for the full API landscape, or jump to a specific `modules/*.
 > Apple may change API signatures, deprecate features, or add new capabilities before the
 > final release. When Apple ships the official macOS 27 GM documentation, this skill will
 > be updated to reflect any changes.
+> A full re-verification is due within 14 days of the macOS 27 GM release (GM trigger
+> clause in `SKILL.md` and `RESEARCH.md`); the `review_by` date is only a backstop.
 >
 > If you find a discrepancy between this skill and the released Apple documentation,
 > please open an issue.

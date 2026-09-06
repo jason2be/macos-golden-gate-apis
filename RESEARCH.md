@@ -4,6 +4,11 @@
 **Sources:** Apple Developer release notes, Apple Newsroom, WWDC26 pages, Wikipedia (for high-level context only). Every API claim below is backed by an Apple source URL listed in the Sources section.
 **Build under study:** macOS 27 Golden Gate Beta 8 (26A5425a, August 31, 2026), Xcode 27 Beta 6.
 
+> **GM 复核条款（2026-09-06 订立）**：macOS 27 / Xcode 27 GM 发布后 14 天内，完成一次全量复核：
+> ① §2 全部 API 条目对照 GM release notes 与本机 GM swiftinterface；② §4 Sources 逐条核对；③ modules/*.md 抽样。
+> 本文件所有断言仅代表 Beta 8 / Beta 6 时点状态，GM 后以 GM 材料为准。与 SKILL.md「GM 触发条款」对应；
+> frontmatter `review_by: 2026-10-31` 仅为兜底。
+
 ---
 
 ## 1. Release metadata

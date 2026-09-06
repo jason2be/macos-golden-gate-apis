@@ -1,10 +1,10 @@
 ---
 name: macos-golden-gate-apis
-version: 0.1.0
+version: 0.1.1
 description: Use when working with macOS 27 Golden Gate APIs, Xcode 27 SDK, FoundationModels Language Model protocol, Core AI, ReadableDocument/WritableDocument, NSRefreshController, App Intents entity/intent schemas, SpotlightSearchTool, Spatial Preview, WebKit for Safari 27, or Apple Silicon-only deployment.
 allowed-tools: [Read, Glob, Grep, WebFetch]
 last_verified: 2026-09-04
-review_by: 2027-03-01
+review_by: 2026-10-31
 os_version: macOS 27 / Xcode 27
 ---
 
@@ -37,6 +37,10 @@ macOS 14+ → macOS 27 Golden Gate upgrade checklist and general migration notes
 
 Authoritative facts come from Apple Developer documentation. Raw research notes:
 `RESEARCH.md` (compiled 2026-09-04, last_verified date above).
+
+- **GM 触发条款**：macOS 27 / Xcode 27 GM 发布后 14 天内，全量复核一次——重点：RESEARCH.md 全部 API 条目对照 GM release notes 与本机 GM swiftinterface（Xcode 27 GM SDK）、Sources 区 URL 逐条核对、modules 抽样。
+- 复核完成前，GM 文档/SDK 与本技能冲突处以 GM 为准。
+- `review_by: 2026-10-31` 仅为兜底日期（最晚 GM + 14 天复核窗口取整）；GM 触发优先于日期；GM 复核完成后 `review_by` 重置为常规节奏（复核日 + 约 6 个月）。
 
 ## Review Approach
 

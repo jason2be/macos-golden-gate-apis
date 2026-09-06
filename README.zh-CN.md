@@ -80,6 +80,8 @@ Agent 会在相关场景自动发现并加载 `SKILL.md`。
 > **本技能基于 Apple Beta 文档编写**（macOS 27 Beta 8、Xcode 27 Beta 6）。
 > Apple 可能在正式发布前更改 API 签名、废弃功能或新增能力。当 Apple 发布
 > macOS 27 正式版文档后，本技能将同步更新。
+> macOS 27 GM 发布后 14 天内将做一次全量复核（见 SKILL.md 与 RESEARCH.md 的 GM 触发条款）；
+> frontmatter 的 review_by 日期仅作兜底。
 >
 > 如果发现本技能与 Apple 正式文档存在差异，请提交 Issue。
 
