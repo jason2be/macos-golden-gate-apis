@@ -75,6 +75,15 @@ The agent will automatically discover and load `SKILL.md` when relevant.
 
 Read `RESEARCH.md` for the full API landscape, or jump to a specific `modules/*.md` for deep dives on a particular framework.
 
+## Local Evidence Sources
+
+Beyond Apple web pages, developer machines doing related work almost always carry the same offline evidence at the same locations — usable with permission, mind the installed versions (timeliness rules in `SKILL.md`):
+
+- **Xcode SDK swiftinterface** (final authority for signatures/availability): `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface` under the active Xcode.
+- **Local Developer Documentation asset** (deprecation/discussion detail): `/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/<hash>.asset/AssetData/documentation-db/index.sql` — read-only SQLite; the `<hash>` directory varies per machine.
+
+SwiftUI queries are routed by the topic index in `SKILL.md`; Tahoe-era SwiftUI platform differences (Table, `.inspector`, window toolbars) defer to the **axiom-macos** skill (`skills/swiftui-differences.md`) when installed.
+
 ## Beta Documentation Notice
 
 > **This skill is based on Apple's beta documentation** (macOS 27 Beta 8, Xcode 27 Beta 6).

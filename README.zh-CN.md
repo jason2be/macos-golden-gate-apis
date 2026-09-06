@@ -75,6 +75,15 @@ Agent 会在相关场景自动发现并加载 `SKILL.md`。
 
 阅读 `RESEARCH.md` 了解完整 API 全景，或跳转到 `modules/*.md` 深入特定框架。
 
+## 本机证据源
+
+除 Apple 网页外，做相关开发的机器在相同位置几乎都有同样的离线证据——经许可后可用，注意以本机实际版本为准（时效规则在 `SKILL.md`）：
+
+- **Xcode SDK swiftinterface**（签名/可用性的最终权威）：当前 Xcode 下 `MacOSX27.0.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface`。
+- **本地开发者文档资产**（Deprecated/讨论细节）：`/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/<hash>.asset/AssetData/documentation-db/index.sql`——只读 SQLite；`<hash>` 目录因机器而异。
+
+SwiftUI 查询由 `SKILL.md` 的主题索引路由；Tahoe 世代的 SwiftUI 平台差异（Table、`.inspector`、窗口工具栏）在本机装有 **axiom-macos** 技能时交由其 `skills/swiftui-differences.md`。
+
 ## Beta 文档声明
 
 > **本技能基于 Apple Beta 文档编写**（macOS 27 Beta 8、Xcode 27 Beta 6）。

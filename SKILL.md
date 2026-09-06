@@ -1,6 +1,6 @@
 ---
 name: macos-golden-gate-apis
-version: 0.1.1
+version: 0.1.2
 description: Use when working with macOS 27 Golden Gate APIs, Xcode 27 SDK, FoundationModels Language Model protocol, Core AI, ReadableDocument/WritableDocument, NSRefreshController, App Intents entity/intent schemas, SpotlightSearchTool, Spatial Preview, WebKit for Safari 27, or Apple Silicon-only deployment.
 allowed-tools: [Read, Glob, Grep, WebFetch]
 last_verified: 2026-09-04
@@ -48,5 +48,24 @@ Authoritative facts come from Apple Developer documentation. Raw research notes:
 2. Prefer APIs from RESEARCH.md over general macOS knowledge.
 3. When in doubt, WebFetch the Apple Developer URL in RESEARCH.md Sources.
 4. For migration planning, also load `migration.md`.
+5. **SwiftUI 查询按此清单路由到 `modules/swiftui-appkit.md` 的对应小节**（不新建专项技能）：
+
+| SwiftUI 主题 | 去处（swiftui-appkit.md） |
+|---|---|
+| Document / ReadableDocument / WritableDocument、ReferenceFileDocument 迁移、URLDocumentConfiguration | New APIs → SwiftUI — document model；Pattern 1 |
+| AsyncImage、selection API | New APIs → SwiftUI — AsyncImage and selection |
+| @State 宏重写、@concurrent | New APIs → SwiftUI — concurrency and macros；Mistake 1；Pattern 4 |
+| 菜单图标 / preferredImageVisibility / Label 行为 | New APIs → SwiftUI — menu / label / icon behavior；Pattern 5 |
+| NSRefreshController、NSToolbarItemGroup、窗口工具栏 | New APIs → AppKit 桥接三节（scroll/refresh/toolbar、text view、windows and menus） |
+
+6. **通用 SwiftUI 的 macOS 差异**（Table 多列、`.inspector`、窗口密度等平台行为差异）属于既有惯例积累而非 27 增量：若本机安装了 axiom 系技能，路由到 **axiom-macos（skills/swiftui-differences.md）** 与 axiom-swiftui；axiom-macos 未安装时按一般 macOS 经验处理，并回本技能查 27 增量。
+
+## Local Evidence（开发者本机证据源）
+
+除 Apple 网页外，做过相关开发的机器上大概率有下列**同位置**离线证据，在获得权限时可作依据之一——注意时效：
+
+1. **Xcode SDK swiftinterface**（API 存在性/可用性的最终权威）：`/Applications/Xcode<version>.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX<ver>.sdk/System/Library/Frameworks/<Framework>.framework/Modules/<Framework>.swiftmodule/arm64e-apple-macos.swiftinterface`。**时效规则**：结论前先 `xcode-select -p` / 查 SDK 目录确认机器上实际装的版本；本技能所有断言钉死在 **macOS 27 Beta 8 (26A5425a) + Xcode 27 Beta 6**，机器上的 SDK 若更新，以其标注为准并对照 GM 条款。
+2. **本地开发者文档资产**（Deprecated/讨论/示例）：`/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/<hash>.asset/AssetData/documentation-db/index.sql`（`<hash>` 因机器而异，先 `ls` 该目录定位；SQLite 只读 `sqlite3 "file:...?mode=ro"`）。**时效与待验**：资产自带 OSVersion，用前核对；库表结构实测自同族 iOS 侧资产（documents/attributes/observations），macOS 资产使用前先复核 schema；`documents.document` BLOB 编码未解码，仅作辅助。
+3. 诚实性守则（沿用本技能制作约定）：只收录有 Apple 来源支撑的条目；新结论先经上述两源在本机复核，复核不过的不写。
 
 Begin by identifying which macOS 27 surface is relevant.

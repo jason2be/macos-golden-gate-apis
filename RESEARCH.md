@@ -9,6 +9,12 @@
 > 本文件所有断言仅代表 Beta 8 / Beta 6 时点状态，GM 后以 GM 材料为准。与 SKILL.md「GM 触发条款」对应；
 > frontmatter `review_by: 2026-10-31` 仅为兜底。
 
+> **本机证据源（SKILL.md「Local Evidence」的底账）**：本文件 §2 的 API 断言除标注网络 URL 外，
+> 均可在开发者本机同位置复核——① Xcode 27 SDK 的 `MacOSX27.0.sdk` swiftinterface（SwiftUI/AppKit/
+> Foundation 等逐框架同目录模式）；② `/System/Library/AssetsV2/com_apple_MobileAsset_AppleDeveloperDocumentation/`
+> 下的文档资产库（index.sql，Deprecated/讨论细节）。两源随机器版本浮动，复核前先确认本机实际
+> SDK/资产版本——见 SKILL.md「Local Evidence」的时效规则。
+
 ---
 
 ## 1. Release metadata
